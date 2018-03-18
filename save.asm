@@ -2,37 +2,55 @@
 
 bits 16
 org 0x100
+beginning:
 
-
-    mov ah, 9
-    mov dx, msg1
-    int 21h
+;     mov ah, 9
+;     mov dx, msg1
+;     int 21h
+    
     
     xor     ax, ax
     mov     es, ax
+    
 
     cli                         ; update ISR address w/ ints disabled
     mov ax, [es:9*4+2]     ; preserve ISR address
     mov [origseg], ax
     mov ax, [es:9*4]
     mov [origint], ax
-    
-    
-    mov     word [es:9*4], irq1isr
-    mov     [es:9*4+2],cs
     sti
     
+    mov ax,0xe000
+    mov es, ax
+    mov di, 0x100
+    mov si, beginning
+    mov cx, (end-beginning)
+    rep movsd
     
+    
+    xor     ax, ax
+    mov     es, ax
+    
+    cli  
+    
+    mov ax, irq1isr
+    mov     word [es:9*4], ax
+    mov ax,0xe000
+    mov     [es:9*4+2],ax
+    sti
+    
+     
 
     ret
 
 irq1isr:
     pusha
     pushf
+    push ds
     
     push cs
     pop ds
-
+    
     ; read keyboard scan code
     in      al, 0x60
  
@@ -73,10 +91,11 @@ irq1isr:
     push word [origint]
     retf
     kbhandlerend:
+    pop ds
     popf
     popa
     iret
-    
+irq1isrend:    
     
 msg1 db "esc pressed",13,10,"$"
 origint dw 0
@@ -86,3 +105,4 @@ origseg dw 0
 kbdbuf:
     times   128 db 0
 
+end:
