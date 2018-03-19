@@ -20,7 +20,7 @@ beginning:
     mov [origint], ax
     sti
     
-    mov ax,0xE000
+    mov ax,0x5000
     mov es, ax
     mov di, 0x100
     mov si, beginning
@@ -35,7 +35,7 @@ beginning:
     
     mov ax, irq1isr
     mov     word [es:8*4], ax
-    mov ax,0xE000
+    mov ax,0x5000
     mov     [es:8*4+2],ax
     sti
     
@@ -47,7 +47,6 @@ irq1isr:
     pusha
     push ds
     push es
-    
     
     push cs
     pop es
@@ -65,6 +64,14 @@ irq1isr:
     
     push cs
     pop ds
+    
+    pushf
+    push cs
+    push word kbhandlerend
+    push word [origseg]
+    push word [origint]
+    retf
+    kbhandlerend:
     
     in      al,60H 
 ;    push ax
@@ -103,13 +110,7 @@ irq1isr:
 
     
     
-    pushf
-    push cs
-    push word kbhandlerend
-    push word [origseg]
-    push word [origint]
-    retf
-    kbhandlerend:
+    
     
     pop es
     pop ds
@@ -137,7 +138,7 @@ savefunc:
     xor si, si
     xor di, di
     
-    mov ax, 0xD000
+    mov ax, 0x6000
     mov es, ax
     mov cx, 0xffff
     rep movsb
@@ -157,7 +158,7 @@ loadfunc:
 
     mov ax, [savedds]
     mov es, ax
-    mov ax, 0xD000
+    mov ax, 0x6000
     mov ds, ax
     xor si,si
     xor di, di
@@ -184,13 +185,13 @@ loadfunc:
     mov ax, [savedax]
     
     
-    
+    pushf
     push word [savedcs]
     push word [savedip]
     
     push word [savedds]
     pop ds
-    retf
+    iret
     
 
 saved db 0
