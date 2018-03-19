@@ -20,27 +20,16 @@ beginning:
     mov [origint], ax
     sti
     
-    mov ax,0x5000
-    mov es, ax
-    mov di, 0x100
-    mov si, beginning
-    mov cx, (end-beginning)
-    rep movsb
-    
-    
-    xor     ax, ax
-    mov     es, ax
-    
-    cli  
-    
-    mov ax, irq1isr
-    mov     word [es:8*4], ax
-    mov ax,0x5000
-    mov     [es:8*4+2],ax
-    sti
+     mov ah,25h      ;Here set your ah register for calling Interrupt vector
+     mov al,8h      ;Your Interrupt Address
+     mov dx,irq1isr   ;Interrupt Handler
+     int 21h
     
     int 0x8
     
+    mov dx, end-beginning
+    mov ax, 3100h
+    int 21h
     ret
 
 irq1isr:
@@ -138,7 +127,7 @@ savefunc:
     xor si, si
     xor di, di
     
-    mov ax, 0x6000
+    mov ax, 0x7000
     mov es, ax
     mov cx, 0xffff
     rep movsb
@@ -158,7 +147,7 @@ loadfunc:
 
     mov ax, [savedds]
     mov es, ax
-    mov ax, 0x6000
+    mov ax, 0x7000
     mov ds, ax
     xor si,si
     xor di, di
@@ -192,6 +181,31 @@ loadfunc:
     push word [savedds]
     pop ds
     iret
+    
+    
+enter_flat_mode:
+   pusha
+   cli                    ; no interrupts
+   push ds                ; save real mode
+ 
+   ;lgdt [gdtinfo]         ; load gdt register
+ 
+   mov  eax, cr0          ; switch to pmode by
+   or al,1                ; set pmode bit
+   mov  cr0, eax
+ 
+   jmp $+2                ; tell 386/486 to not crash
+ 
+   mov  bx, 0x08          ; select descriptor 1
+   mov  ds, bx            ; 8h = 1000b
+ 
+   and al,0xFE            ; back to realmode
+   mov  cr0, eax          ; by toggling bit again
+ 
+   pop ds                 ; get back old segment
+   sti
+   popa
+   ret
     
 
 saved db 0
