@@ -107,6 +107,7 @@ irq1isr:
     iret
 irq1isrend: 
 
+;save state
 savefunc:
     pusha
     push ds
@@ -122,18 +123,44 @@ savefunc:
     mov cx, 24
     rep movsb
     
+    ; open savefile
+    mov ah,3ch
+    mov dx,filename
+    int 21h
+    mov [handle],ax 
+    
+    
+    mov bx, [handle]
+    
+    mov ah, 40h
+    mov cx, regsaveend-regsavestart
+    mov dx, regsavestart
+    int 21h
+    
+    mov bx, [handle]
+    
+    mov ah,40h
+    mov cx,0xffff
+    xor dx, dx
     push word [savedcs]
     pop ds
-    xor si, si
-    xor di, di
+    int 21h
     
-    mov ax, 0x7000
-    mov es, ax
-    mov cx, 0xffff
-    rep movsb
+    ;xor si, si
+    ;xor di, di
+    
+    ;mov ax, 0x7000
+    ;mov es, ax
+    ;mov cx, 0xffff
+    ;rep movsb
     
     push cs
     pop ds
+    
+    mov ah,3eh
+    mov bx,[handle]
+    int 21h
+    
     
     mov al, 1
     mov [saved], al
@@ -143,20 +170,55 @@ savefunc:
     popa    
     ret
     
+;load saved state
 loadfunc:
 
-    mov ax, [savedds]
-    mov es, ax
-    mov ax, 0x7000
-    mov ds, ax
-    xor si,si
-    xor di, di
-   
-    mov cx, 0xffff
-    rep movsb
+    cli
+    mov ax,3d02h
+    mov dx,filename
+    int 21h
+    mov [handle],ax 
+    
+    mov bx, [handle]
+    mov ah, 3fh
+    mov cx, regsaveend-regsavestart
+    mov dx, regsavestart
+    int 21h
+    
+    mov ax, ss
+    mov [stashss], ax
+    mov ax, sp
+    mov [stashsp], ax
     
     push cs
+    pop ss
+    mov ax, endstack - 2
+    mov sp, ax
+    
+       
+    mov bx,[handle]
+    mov ax, [savedcs]
+    mov ds, ax
+    
+    mov ah,3fh
+    
+    mov cx,0xffff
+    xor dx, dx
+    
+    
+    int 21h 
+
+    sti    
+    push cs
     pop ds
+    
+    mov ax, [stashss]
+    mov ss, ax
+    mov ax, [stashsp]
+    mov sp, ax
+    
+    
+
 
     mov di, [saveddi]
     mov si, [savedsi]
@@ -181,6 +243,7 @@ loadfunc:
     push word [savedds]
     pop ds
     iret
+    
     
     
 enter_flat_mode:
@@ -214,9 +277,11 @@ saved db 0
     
     
 msg1 db "esc pressed",13,10,"$"
+filename db "save.dat",0
 numbers db "0123456789ABCDEF"
 origint dw 0
 origseg dw 0
+handle dw 0
 
 origcs dw 0
 
@@ -234,7 +299,7 @@ currentip dw 0
 currentcs dw 0
 currentfl dw 0
 
-
+regsavestart:
 savedds dw 0
 saveddi dw 0
 savedsi dw 0
@@ -247,11 +312,15 @@ savedax dw 0
 savedip dw 0
 savedcs dw 0
 savedfl dw 0
+regsaveend:
+
+stashss dw 0
+stashsp dw 0
 
 
 
 
-kbdbuf:
+stack:
     times   128 db 0
-
+endstack:
 end:
