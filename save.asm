@@ -2,17 +2,11 @@
 
 bits 16
 org 0x100
-beginning:
-
-;     mov ah, 9
-;     mov dx, msg1
-;     int 21h
-    
+beginning:    
     
     xor     ax, ax
     mov     es, ax
     
-
     cli                         ; update ISR address w/ ints disabled
     mov ax, [es:8*4+2]     ; preserve ISR address
     mov [origseg], ax
@@ -26,6 +20,10 @@ beginning:
      int 21h
     
     int 0x8
+    
+    mov ah, 9
+    mov dx, msg1
+    int 21h
     
     mov dx, end-beginning
     mov ax, 3100h
@@ -63,34 +61,9 @@ irq1isr:
     kbhandlerend:
     
     in      al,60H 
-;    push ax
-    
-;    mov ah, 02h
-;    xor bx, bx
-;    mov bl, al
-;    shr bl, 4
-;    add bx, numbers
-;    mov dl, [bx]
-;    int 21h
-    
-;    pop ax
-;    mov ah, 02h
-;    xor bx, bx
-;    mov bl, al
-;    and bl, 0xf
-;    add bx, numbers
-;    mov dl, [bx]
-;    int 21h
-;    mov dl, 13
-;    int 21h
-;    mov dl, 10
-;    int 21h
     
     cmp al, 0x57
     jnz notsave
-    ;mov ah ,9
-    ;mov dx, msg1
-    ;int 21h
     call savefunc
     notsave:
     
@@ -145,14 +118,6 @@ savefunc:
     push word [savedcs]
     pop ds
     int 21h
-    
-    ;xor si, si
-    ;xor di, di
-    
-    ;mov ax, 0x7000
-    ;mov es, ax
-    ;mov cx, 0xffff
-    ;rep movsb
     
     push cs
     pop ds
@@ -276,7 +241,7 @@ saved db 0
     
     
     
-msg1 db "esc pressed",13,10,"$"
+msg1 db "savestate loaded. Press f11 to save, f12 to load.",13,10,"$"
 filename db "save.dat",0
 numbers db "0123456789ABCDEF"
 origint dw 0
