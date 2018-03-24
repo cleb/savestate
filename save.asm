@@ -88,6 +88,7 @@ savefunc:
     cmp byte [saved], 0
     jnz endsave
     
+    ;move current registers to save area
     push ds
     pop es
     
@@ -96,28 +97,91 @@ savefunc:
     mov cx, 24
     rep movsb
     
+    ;save video mode
+    mov ah, 0fh
+    int 10h
+    mov [videomode], al
+    mov [videowidth], ah
+    mov [videopage], bh
+    
+    
     ; open savefile
     mov ah,3ch
     mov dx,filename
     int 21h
     mov [handle],ax 
     
-    
+    ;save registers
     mov bx, [handle]
-    
     mov ah, 40h
     mov cx, regsaveend-regsavestart
     mov dx, regsavestart
     int 21h
     
+    ;save cs memory
+    push ds
     mov bx, [handle]
-    
     mov ah,40h
     mov cx,0xffff
     xor dx, dx
     push word [savedcs]
     pop ds
     int 21h
+    pop ds
+    
+    ;save video
+    mov ah, [videomode]
+    cmp ah, 0dh
+    jz savemode0d
+    cmp ah, 10h
+    jz savemode10
+    jmp endvideosave
+    
+    savemode0d:
+    push ds
+    mov cx, 4
+    saveplane:
+    push cx
+    mov ax, 5h
+    mov dx, 3ceh
+    OUT dx, ax         ;set up for plane masking
+    mov ah, cl
+    dec ah
+    mov al, 04h
+    OUT dx, ax             ;n is: 0102H=plane 0; 0202H=plane 1
+                            ;      0402H=plane 2; 0802H=plane 3
+    push ds
+    mov bx, [handle]
+    mov ax, 0a000h
+    mov ds, ax
+    mov ah,40h
+    mov cx,0x4000
+    xor dx, dx
+    int 21h
+    pop ds
+    pop cx
+    loop saveplane
+    mov ax, 0f02h
+    mov dx, 3c4h
+    out dx, ax         ;restore normal plane mask
+    pop ds
+    jmp endvideosave
+    
+    savemode10:
+    push ds
+    mov bx, [handle]
+    mov ax, 0a000h
+    mov ds, ax
+    mov ah,40h
+    mov cx,0xffff
+    xor dx, dx
+    int 21h
+    pop ds
+    
+    
+    
+    endvideosave:
+    
     
     push cs
     pop ds
@@ -139,16 +203,20 @@ savefunc:
 loadfunc:
 
     cli
+    ;open file
     mov ax,3d02h
     mov dx,filename
     int 21h
     mov [handle],ax 
-    
+
+    ;read registers
     mov bx, [handle]
     mov ah, 3fh
     mov cx, regsaveend-regsavestart
     mov dx, regsavestart
     int 21h
+    
+    ;preserve stack segment 
     
     mov ax, ss
     mov [stashss], ax
@@ -160,20 +228,15 @@ loadfunc:
     mov ax, endstack - 2
     mov sp, ax
     
-       
+    ;load cs
     mov bx,[handle]
     mov ax, [savedcs]
     mov ds, ax
-    
     mov ah,3fh
-    
     mov cx,0xffff
     xor dx, dx
+    int 21h
     
-    
-    int 21h 
-
-    sti    
     push cs
     pop ds
     
@@ -182,9 +245,71 @@ loadfunc:
     mov ax, [stashsp]
     mov sp, ax
     
+    ;load video
+    mov ah, [videomode]
+    cmp ah, 0dh
+    jz loadmode0d
+    cmp ah, 10h
+    jz loadmode10
+    jmp endvideoload
+    
+    loadmode0d:
+    push ds
+    mov cx, 4
+    loadplane:
+    push cx
+    push ds
+    
+    mov al, 1
+    dec cl
+    shl al, cl
+    shl ax, 8
+    add ax, 02h
+    mov dx, 3c4h
+    OUT dx, ax             ;n is: 0102H=plane 0; 0202H=plane 1
+                            ;      0402H=plane 2; 0802H=plane 3
+    
+    mov bx, [handle]
+    mov ax, 0a000h
+    mov ds, ax
+    mov ah,3fh
+    mov cx,0x4000
+    xor dx, dx
+    int 21h
+    
+    pop ds
+    pop cx
+    loop loadplane
+    mov ax, 0f02h
+    mov dx, 3c4h
+    OUT dx, ax         ;restore normal plane mask
+    pop ds
+    jmp endvideoload
+    
+    loadmode10:
+    push ds
+    mov bx, [handle]
+    mov ax, 0a000h
+    mov ds, ax
+    mov ah,3fh
+    mov cx,0xffff
+    xor dx, dx
+    int 21h
+    pop ds
+    
+    
+    
+    endvideoload:
+    
+    sti    
+    push cs
+    pop ds
+    
+    
+    
     
 
-
+    ;restore registers
     mov di, [saveddi]
     mov si, [savedsi]
     mov bp, [savedbp]
@@ -200,7 +325,7 @@ loadfunc:
     
     mov ax, [savedax]
     
-    
+    ;jump to saved position
     pushf
     push word [savedcs]
     push word [savedip]
@@ -232,8 +357,10 @@ enter_flat_mode:
  
    pop ds                 ; get back old segment
    sti
-   popa
-   ret
+   
+popa
+   
+ret
     
 
 saved db 0
@@ -277,6 +404,9 @@ savedax dw 0
 savedip dw 0
 savedcs dw 0
 savedfl dw 0
+videomode db 0
+videowidth db 0
+videopage db 0
 regsaveend:
 
 stashss dw 0
