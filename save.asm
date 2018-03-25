@@ -36,6 +36,12 @@ irq1isr:
     push es
     
     push cs
+    pop ds
+    
+    mov ax, es
+    mov [currentes], ax
+    
+    push cs
     pop es
     
     push ss
@@ -94,8 +100,9 @@ savefunc:
     
     mov si, currentds
     mov di, savedds
-    mov cx, 24
+    mov cx, 26
     rep movsb
+    
     
     ;save video mode
     mov ah, 0fh
@@ -216,6 +223,7 @@ loadfunc:
     mov dx, regsavestart
     int 21h
     
+    
     ;preserve stack segment 
     
     mov ax, ss
@@ -316,6 +324,8 @@ loadfunc:
     mov ax, [savedsp]
     add ax, 6
     mov sp, ax
+    mov ax, [savedes]
+    mov es, ax
     mov bx, [savedbx]
     mov dx, [saveddx]
     mov cx, [savedcx]
@@ -390,6 +400,7 @@ currentax dw 0
 currentip dw 0
 currentcs dw 0
 currentfl dw 0
+currentes dw 0
 
 regsavestart:
 savedds dw 0
@@ -404,6 +415,7 @@ savedax dw 0
 savedip dw 0
 savedcs dw 0
 savedfl dw 0
+savedes dw 0
 videomode db 0
 videowidth db 0
 videopage db 0
