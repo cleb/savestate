@@ -8,24 +8,35 @@ beginning:
     mov     es, ax
     
     cli                         ; update ISR address w/ ints disabled
-    mov ax, [es:8*4+2]     ; preserve ISR address
+    mov ax, [es:9*4+2]     ; preserve ISR address
     mov [origseg], ax
-    mov ax, [es:8*4]
+    mov ax, [es:9*4]
     mov [origint], ax
+    
+    mov ax, [es:21h*4+2]     ; preserve ISR address
+    mov [orig21seg], ax
+    mov ax, [es:21h*4]
+    mov [orig21offset], ax
     sti
     
      mov ah,25h      ;Here set your ah register for calling Interrupt vector
-     mov al,8h      ;Your Interrupt Address
+     mov al,9h      ;Your Interrupt Address
      mov dx,irq1isr   ;Interrupt Handler
      int 21h
+     
+     mov ah,25h      ;Here set your ah register for calling Interrupt vector
+     mov al,21h      ;Your Interrupt Address
+     mov dx,i21hhandler   ;Interrupt Handler
+     int 21h
     
-    int 0x8
     
     mov ah, 9
     mov dx, msg1
     int 21h
     
     mov dx, end-beginning
+    shr dx, 4
+    add dx, 17
     mov ax, 3100h
     int 21h
     ret
@@ -86,6 +97,33 @@ irq1isr:
     iret
 irq1isrend: 
 
+i21hhandler:
+    pusha
+    mov cx, ds
+    push cs
+    pop ds
+    mov [dsstash], cx
+    cmp ah, 25h
+    jnz not25h
+    
+    ;int 25h handler
+    cmp al, 9
+    jnz not9h
+    
+    mov [origint], dx
+    mov dx, ds
+    mov [origseg], dx 
+    
+    not9h:    
+    not25h:
+    popa
+    
+    push word [orig21seg]
+    push word [orig21offset]
+    push word [dsstash]
+    pop ds
+    retf
+    
 ;save state
 savefunc:
     pusha
@@ -285,7 +323,8 @@ loadfunc:
     xor dx, dx
     int 21h
     
-    pop ds
+    
+pop ds
     pop cx
     loop loadplane
     mov ax, 0f02h
@@ -383,9 +422,15 @@ filename db "save.dat",0
 numbers db "0123456789ABCDEF"
 origint dw 0
 origseg dw 0
+
+orig21seg dw 0
+orig21offset dw 0
+
 handle dw 0
 
 origcs dw 0
+
+dsstash dw 0
 
 
 currentds dw 0
