@@ -252,6 +252,23 @@ savefunc:
     int 21h
     pop ds
     
+    mov ax, [savedds]
+    cmp ax, [savedcs]
+    jz nosaveds
+    
+    ;save ds memory
+    push ds
+    mov bx, [handle]
+    mov ah,40h
+    mov cx,0xffff
+    xor dx, dx
+    push word [savedds]
+    pop ds
+    int 21h
+    pop ds
+    
+    nosaveds:
+    
     ;save video
     mov ah, [videomode]
     cmp ah, 0dh
@@ -364,10 +381,29 @@ loadfunc:
     push cs
     pop ds
     
+    mov ax, [savedds]
+    cmp ax, [savedcs]
+    jz noloadds
+    
+    ;load ds memory
+    mov bx, [handle]
+    mov ah,3fh
+    mov cx,0xffff
+    xor dx, dx
+    push word [savedds]
+    pop ds
+    int 21h
+    
+    push cs
+    pop ds
+    
+    noloadds:
+    
     mov ax, [stashss]
     mov ss, ax
     mov ax, [stashsp]
     mov sp, ax
+    
     
     ;load video
     mov ah, [videomode]
