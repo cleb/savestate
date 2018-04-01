@@ -207,8 +207,6 @@ savefunc:
     pusha
     push ds
     
-    cmp byte [saved], 0
-    jnz endsave
     
     ;move current registers to save area
     push ds
@@ -329,10 +327,6 @@ savefunc:
     mov ah,3eh
     mov bx,[handle]
     int 21h
-    
-    
-    mov al, 1
-    mov [saved], al
     
     endsave:
     pop ds
