@@ -17,6 +17,11 @@ beginning:
     mov [orig21seg], ax
     mov ax, [es:21h*4]
     mov [orig21offset], ax
+    
+    mov ax, [es:8h*4+2]     ; preserve ISR address
+    mov [orig8seg], ax
+    mov ax, [es:8h*4]
+    mov [orig8offset], ax
     sti
     
      mov ah,25h      ;Here set your ah register for calling Interrupt vector
@@ -28,7 +33,11 @@ beginning:
      mov al,21h      ;Your Interrupt Address
      mov dx,i21hhandler   ;Interrupt Handler
      int 21h
-    
+
+     mov ah,25h      ;Here set your ah register for calling Interrupt vector
+     mov al,8h      ;Your Interrupt Address
+     mov dx,i8hhandler   ;Interrupt Handler
+     int 21h
     
     mov ah, 9
     mov dx, msg1
@@ -46,8 +55,13 @@ irq1isr:
     push ds
     push es
     
+    mov ax, ds
+    
+    
     push cs
     pop ds
+    
+    mov [dsstash], ax
     
     mov ax, es
     mov [currentes], ax
@@ -69,13 +83,26 @@ irq1isr:
     push cs
     pop ds
     
+    pop es
+    pop ax
+    popa
+    
     pushf
     push cs
     push word kbhandlerend
     push word [origseg]
     push word [origint]
+    push word [dsstash]
+    pop ds
     retf
     kbhandlerend:
+    
+    pusha
+    push ds
+    push es
+    
+    push cs
+    pop ds
     
     in      al,60H 
     
@@ -86,11 +113,23 @@ irq1isr:
     
     cmp al, 0x58
     jz loadfunc
+    
+     ; send EOI to XT keyboard
+    in      al, 0x61
+    mov     ah, al
+    or      al, 0x80
+    out     0x61, al
+    mov     al, ah
+    out     0x61, al
+
+    ; send EOI to master PIC
+    mov     al, 0x20
+    out     0x20, al
 
     
     
     
-    
+
     pop es
     pop ds
     popa
@@ -120,6 +159,45 @@ i21hhandler:
     
     push word [orig21seg]
     push word [orig21offset]
+    push word [dsstash]
+    pop ds
+    retf
+    
+;periodically check if our i9handler is in place (many games change it outide i21h)
+i8hhandler:
+    pusha
+    push es
+    mov ax, ds
+    
+    push cs
+    pop ds
+    
+    mov [dsstash], ax
+    
+    xor     ax, ax
+    mov     es, ax
+
+    ;check if your handler is present
+    mov ax, [es:9*4]
+    cmp ax, irq1isr
+    jz i9notchanged
+    
+    mov [origint], ax
+    mov ax, [es:9*4+2]
+    mov [origseg], ax
+    
+    mov ax, irq1isr
+    mov [es:9*4], ax
+    push cs
+    pop word [es:9*4+2]
+    
+    i9notchanged:
+    
+    pop es
+    popa
+    
+    push word [orig8seg]
+    push word [orig8offset]
     push word [dsstash]
     pop ds
     retf
@@ -425,6 +503,9 @@ origseg dw 0
 
 orig21seg dw 0
 orig21offset dw 0
+
+orig8seg dw 0
+orig8offset dw 0
 
 handle dw 0
 
